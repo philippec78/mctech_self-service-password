@@ -118,3 +118,20 @@ services:
         reservations:
           cpus: "0.10"
           memory: 64M
+    volumes:
+      - self-service-password_htdocs:/var/www/htdocs
+      - self-service-password_config:/var/www/conf
+
+volumes:
+  self-service-password_htdocs:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.10.202,rw,noatime,rsize=8192,wsize=8192,tcp,timeo=14
+      device: ":/volume3/docker-volumes/self-service-password/htdocs"
+  self-service-password_config:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=192.168.10.202,rw,noatime,rsize=8192,wsize=8192,tcp,timeo=14
+      device: ":/volume3/docker-volumes/self-service-password/config"
