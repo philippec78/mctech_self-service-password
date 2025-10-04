@@ -1,0 +1,120 @@
+version: "3.8"
+
+services:
+  self-service-password:
+    image: ltbproject/self-service-password:latest
+    ports:
+      - target: 80
+        published: 8094
+        protocol: tcp
+        mode: ingress
+    environment:
+      SSP_DEBUG: "false"
+      SSP_KEYPHRASE: "devsecret"
+      SSP_LANG: "fr"
+      SSP_LDAP_BASE: "cn=users,dc=ldap,dc=mctech,dc=lan"
+      SSP_LDAP_BINDDN: "uid=root,cn=users,dc=ldap,dc=mctech,dc=lan"
+      SSP_LDAP_BINDPW: "scuzumxm"  # TEST UNIQUEMENT — en prod: secrets
+      SSP_LDAP_LOGIN_ATTRIBUTE: "uid"
+      SSP_LDAP_FILTER: "(&(objectClass=person)(uid={login}))"
+      SSP_LDAP_STARTTLS: "false"
+      SSP_LDAP_URL: "ldaps://192.168.10.202:636"
+      SSP_PWD_MIN_LENGTH: "10"
+      SSP_USE_HTTPS: "true"
+      SSP_WHO_CHANGE: "manager"
+      LDAPTLS_REQCERT: "never"
+
+      # —— Reset par email ——
+      SSP_USE_RESET_BY_MAIL: "true"
+      SSP_RESET_URL: "http://docker01.mctech.ch:8094"   # URL publique du portail (https recommandé)
+      SSP_TOKEN_LIFETIME: "900"                         # 900s = 15 min
+
+      # —— SMTP / PHPMailer ——
+      SSP_MAIL_FROM: "philippe@mctech.ch"
+      SSP_MAIL_FROM_NAME: "mctech Password Reset"
+      SSP_MAIL_SUBJECT: "Réinitialisation de votre mot de passe"
+      SSP_MAIL_ATTR: "mail"                             # attribut LDAP contenant l’adresse
+      SSP_MAIL_SMTP_DEBUG: "0"
+      SSP_SMTP_HOST: "mail.mctech.ch"
+      SSP_SMTP_PORT: "465"
+      SSP_SMTP_SECURE: "ssl"                            # "tls" (587) ou "ssl" (465) ou "none"
+      SSP_SMTP_AUTH: "true"
+      SSP_SMTP_USER: "philippe@mctech.ch"
+      SSP_SMTP_PASS: "tb25zrasu"                         # TEST UNIQUEMENT — secrets en prod
+
+      # (Optionnel) Accepter un certificat SMTP self-signed en test
+      SSP_SMTP_ALLOW_SELF_SIGNED: "true"                # "true" pour désactiver verify_peer (à éviter en prod)
+    command:
+      - bash
+      - -lc
+      - |
+        set -e
+        # Évite l'avertissement Apache sur ServerName
+        printf '%s\n' 'ServerName localhost' > /etc/apache2/conf-available/servername.conf
+        a2enconf servername >/dev/null 2>&1 || true
+
+        mkdir -p /var/www/conf
+        {
+          printf '%s\n' '<?php'
+          printf '%s\n' '// Generated from env (tests only)'
+
+          # —— LDAP ——
+          printf '%s\n' '$$keyphrase = getenv('\''SSP_KEYPHRASE'\'') ?: '\''devsecret'\'';'
+          printf '%s\n' '$$debug = (getenv('\''SSP_DEBUG'\'') === '\''true'\'');'
+          printf '%s\n' '$$ldap_url = getenv('\''SSP_LDAP_URL'\'') ?: '\''ldap://ldap'\'';'
+          printf '%s\n' '$$ldap_starttls = (getenv('\''SSP_LDAP_STARTTLS'\'') === '\''true'\'');'
+          printf '%s\n' '$$ldap_binddn = getenv('\''SSP_LDAP_BINDDN'\'') ?: '\'''\'';'
+          printf '%s\n' '$$ldap_bindpw = getenv('\''SSP_LDAP_BINDPW'\'') ?: '\'''\'';'
+          printf '%s\n' '$$ldap_base = getenv('\''SSP_LDAP_BASE'\'') ?: '\'''\'';'
+          printf '%s\n' '$$ldap_login_attribute = getenv('\''SSP_LDAP_LOGIN_ATTRIBUTE'\'') ?: '\''uid'\'';'
+          printf '%s\n' '$$ldap_filter = getenv('\''SSP_LDAP_FILTER'\'') ?: '\''(&(objectClass=person)(uid={login}))'\'';'
+
+          # —— Password change / UI ——
+          printf '%s\n' '$$change_password = true;'
+          printf '%s\n' '$$who_change_password = getenv('\''SSP_WHO_CHANGE'\'') ?: '\''manager'\'';'
+          printf '%s\n' '$$pwd_min_length = intval(getenv('\''SSP_PWD_MIN_LENGTH'\'') ?: 8);'
+          printf '%s\n' '$$use_https = (getenv('\''SSP_USE_HTTPS'\'') === '\''true'\'');'
+          printf '%s\n' '$$lang = getenv('\''SSP_LANG'\'') ?: '\''fr'\'';'
+
+          # —— Reset par email ——
+          printf '%s\n' '$$use_reset_by_mail = (getenv('\''SSP_USE_RESET_BY_MAIL'\'') === '\''true'\'');'
+          printf '%s\n' '$$reset_url         = getenv('\''SSP_RESET_URL'\'') ?: '\''http://localhost'\'';'
+          printf '%s\n' '$$token_lifetime    = intval(getenv('\''SSP_TOKEN_LIFETIME'\'') ?: 900);'
+
+          # —— SMTP (PHPMailer) ——
+          printf '%s\n' '$$mail_from        = getenv('\''SSP_MAIL_FROM'\'') ?: '\''no-reply@example.com'\'';'
+          printf '%s\n' '$$mail_from_name   = getenv('\''SSP_MAIL_FROM_NAME'\'') ?: '\''Password Reset'\'';'
+          printf '%s\n' '$$mail_subject     = getenv('\''SSP_MAIL_SUBJECT'\'') ?: '\''Password reset'\'';'
+          printf '%s\n' '$$mail_attribute   = getenv('\''SSP_MAIL_ATTR'\'') ?: '\''mail'\'';'
+          printf '%s\n' '$$mail_smtp_auth   = (getenv('\''SSP_SMTP_AUTH'\'') === '\''true'\'');'
+          printf '%s\n' '$$mail_smtp_host   = getenv('\''SSP_SMTP_HOST'\'') ?: '\''localhost'\'';'
+          printf '%s\n' '$$mail_smtp_user   = getenv('\''SSP_SMTP_USER'\'') ?: '\'''\'';'
+          printf '%s\n' '$$mail_smtp_pass   = getenv('\''SSP_SMTP_PASS'\'') ?: '\'''\'';'
+          printf '%s\n' '$$mail_smtp_port   = intval(getenv('\''SSP_SMTP_PORT'\'') ?: 25);'
+          printf '%s\n' '$$mail_smtp_secure = getenv('\''SSP_SMTP_SECURE'\'') ?: '\''none'\'';'  # 'tls' | 'ssl' | 'none'
+          printf '%s\n' '$$mail_smtp_debug  = intval(getenv('\''SSP_MAIL_SMTP_DEBUG'\'') ?: 0);'
+
+          # (Optionnel) Autoriser cert SMTP self-signed en test
+          printf '%s\n' 'if (getenv('\''SSP_SMTP_ALLOW_SELF_SIGNED'\'') === '\''true'\'') {'
+          printf '%s\n' '  $$mail_smtp_options = array('
+          printf '%s\n' '    '\''ssl'\'' => array('
+          printf '%s\n' '      '\''verify_peer'\'' => false, '\''verify_peer_name'\'' => false, '\''allow_self_signed'\'' => true'
+          printf '%s\n' '    )'
+          printf '%s\n' '  );'
+          printf '%s\n' '}'
+
+          printf '%s\n' '?>'
+        } > /var/www/conf/config.inc.local.php
+
+        exec apache2ctl -D FOREGROUND
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
