@@ -1,0 +1,41 @@
+html, body {
+  background: #eee;
+  padding-top: 20px;
+  font-size: 12pt;
+}
+
+.shadow {
+  box-shadow: none !important;
+}
+
+.alert-success {
+  --bs-alert-color: #ffffff !important;
+  --bs-alert-bg: #000000 !important;
+  --bs-alert-border-color: #000000 !important;
+  --bs-alert-link-color: #ffffff !important;
+}
+
+.alert-info {
+  --bs-alert-color: #000 !important;
+  --bs-alert-bg: #ececec !important;
+  --bs-alert-border-color: #ececec !important;
+  --bs-alert-link-color: #000 !important;
+}
+
+.title.alert-success h1 {
+  color: transparent;
+  position: relative;
+}
+
+.title.alert-success h1::after {
+  content: "Changement de mot de passe"; /* ton nouveau texte */
+  color: #ffffff;             /* ton rouge personnalisé */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); /* centre parfaitement le texte */
+  text-align: center;
+  white-space: nowrap;        /* évite le retour à la ligne */
+  width: 100%;
+  font-weight: bold;
+}
